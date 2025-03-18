@@ -27,4 +27,4 @@ This logical model addresses the initial challenges:
 - Centralization: Unified database for crop management, sustainability tracking, and client coordination.
 - Sustainability: Metrics link directly to crops and farms, allowing for targeted monitoring
 
-![388917992-5246eac5-cd09-46c9-a9a7-e79cfa49e189.png](../../Downloads/388917992-5246eac5-cd09-46c9-a9a7-e79cfa49e189.png)
+![UML-Urban.png](UML-Urban.png)
