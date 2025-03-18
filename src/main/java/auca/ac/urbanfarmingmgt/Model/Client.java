@@ -1,8 +1,14 @@
-package auca.ac.urbanfarmingmgt.model;
+package auca.ac.urbanfarmingmgt.Model;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @Table(name = "Clients")
 public class Client {
     @Id
@@ -12,4 +18,8 @@ public class Client {
     private String contactInfo;
     private String orderPreferences;
     private String paymentHistory;
+
+    @ManyToOne
+    @JoinColumn(name = "orderID", nullable = false)
+    private Order order;
 }

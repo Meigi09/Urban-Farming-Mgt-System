@@ -4,17 +4,16 @@ import auca.ac.urbanfarmingmgt.Repository.CropRepository;
 import auca.ac.urbanfarmingmgt.Repository.FarmRepository;
 import auca.ac.urbanfarmingmgt.Repository.HarvestRepository;
 import auca.ac.urbanfarmingmgt.Repository.SustainabilityMetricRepository;
-import auca.ac.urbanfarmingmgt.model.Crop;
-import auca.ac.urbanfarmingmgt.model.Farm;
-import auca.ac.urbanfarmingmgt.model.Harvest;
-import auca.ac.urbanfarmingmgt.model.SustainabilityMetric;
-
+import auca.ac.urbanfarmingmgt.Model.Crop;
+import auca.ac.urbanfarmingmgt.Model.Farm;
+import auca.ac.urbanfarmingmgt.Model.Harvest;
+import auca.ac.urbanfarmingmgt.Model.SustainabilityMetric;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class CropService {
@@ -31,207 +30,206 @@ public class CropService {
     @Autowired
     private SustainabilityMetricRepository metricsRepository;
 
-    /**
-     * Save a new crop or update an existing one
-     * @param crop The crop entity to save
-     * @return A message indicating the result of the operation
-     */
-    public String saveCrop(Crop crop) {
+    // Save a new crop
+    @Transactional
+    public void saveCrop(Crop crop) {
         try {
             cropRepository.save(crop);
-            return "Crop saved successfully with ID: " + crop.getCropID();
         } catch (Exception e) {
-            return "Failed to save crop: " + e.getMessage();
+            throw new RuntimeException("Failed to save crop: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Get all crops in the system
-     * @return List of all crops
-     */
+    // Get all crops
     public List<Crop> getAllCrops() {
         return cropRepository.findAll();
     }
 
-    /**
-     * Find a crop by its ID
-     * @param cropId The ID of the crop to retrieve
-     * @return The crop if found, otherwise null
-     */
+    // Get a crop by ID
     public Crop getCropById(Integer cropId) {
-        Optional<Crop> crop = cropRepository.findById(cropId);
-        return crop.orElse(null);
+        return cropRepository.findById(cropId)
+                .orElseThrow(() -> new RuntimeException("Crop not found with ID: " + cropId));
     }
 
-    /**
-     * Find crops by type
-     * @param cropType The type of crop to search for
-     * @return List of crops matching the type
-     */
+    // Get crops by type
     public List<Crop> getCropsByType(String cropType) {
         return cropRepository.findByCropType(cropType);
     }
 
-    /**
-     * Delete a crop by its ID
-     * @param cropId The ID of the crop to delete
-     * @return A message indicating the result of the operation
-     */
-    public String deleteCrop(Integer cropId) {
+    // Delete a crop by ID
+    @Transactional
+    public void deleteCrop(Integer cropId) {
         try {
-            if (cropRepository.existsById(cropId)) {
-                cropRepository.deleteById(cropId);
-                return "Crop deleted successfully";
-            } else {
-                return "Crop not found with ID: " + cropId;
+            if (!cropRepository.existsById(cropId)) {
+                throw new RuntimeException("Crop not found with ID: " + cropId);
             }
+            cropRepository.deleteById(cropId);
         } catch (Exception e) {
-            return "Failed to delete crop: " + e.getMessage();
+            throw new RuntimeException("Failed to delete crop: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Determine planting eligibility based on farm location and crop requirements
-     * @param farmId The ID of the farm
-     * @param schedule The planned planting schedule
-     * @param cropLocationRequirements The location requirements for the crop
-     * @return A message indicating eligibility
-     */
-    public String plantEligibility(Integer farmId, Date schedule, String cropLocationRequirements) {
-        try {
-            Optional<Farm> farmOptional = farmRepository.findById(farmId);
-            if (farmOptional.isPresent()) {
-                Farm farm = farmOptional.get();
-                String farmLocation = farm.getLocation();
+    // Check if a crop is eligible for planting in a specific farm
+    public boolean isEligibleForPlanting(Integer farmId, String cropRequirement) {
+        Farm farm = farmRepository.findById(farmId)
+                .orElseThrow(() -> new RuntimeException("Farm not found with ID: " + farmId));
 
-                // Simple check for location compatibility
-                if (farmLocation != null && farmLocation.contains(cropLocationRequirements)) {
-                    return "The crop is eligible for planting at " + farmLocation + " on schedule: " + schedule;
-                } else {
-                    return "The crop is not suitable for planting at " + farmLocation +
-                            ". Required conditions: " + cropLocationRequirements;
-                }
-            } else {
-                return "Farm not found with ID: " + farmId;
-            }
-        } catch (Exception e) {
-            return "Failed to check planting eligibility: " + e.getMessage();
-        }
+        String farmLocation = farm.getLocation();
+        return farmLocation != null && farmLocation.contains(cropRequirement);
     }
 
-    /**
-     * Link a harvest to a crop
-     * @param cropId The ID of the crop
-     * @param yield The yield from the harvest
-     * @param qualityRating The quality rating of the harvest
-     * @return A message indicating the result of the operation
-     */
-    public String linkHarvest(Integer cropId, Double yield, Integer qualityRating) {
-        try {
-            Optional<Crop> cropOptional = cropRepository.findById(cropId);
-            if (cropOptional.isPresent()) {
-                Crop crop = cropOptional.get();
-                Farm farm = crop.getFarm();
-
-                Harvest harvest = Harvest.builder()
-                        .crop(crop)
-                        .farm(farm)
-                        .date(new Date()) // Current date for the harvest
-                        .yield(yield)
-                        .qualityRating(qualityRating)
-                        .build();
-
-                // Set inventory if needed (would require additional inventory service)
-                // harvest.setInventory(inventoryService.getDefaultInventory());
-
-                harvestRepository.save(harvest);
-
-                // Update average yield for the crop
-                double totalYield = 0.0;
-                int count = 0;
-
-                for (Harvest h : crop.getHarvests()) {
-                    totalYield += h.getYield();
-                    count++;
-                }
-
-                // Include the new harvest
-                totalYield += yield;
-                count++;
-
-                double avgYield = totalYield / count;
-                crop.setAverageYield(avgYield);
-                cropRepository.save(crop);
-
-                return "Harvest linked successfully to crop: " + crop.getCropType();
-            } else {
-                return "Crop not found with ID: " + cropId;
-            }
-        } catch (Exception e) {
-            return "Failed to link harvest: " + e.getMessage();
-        }
+    // Get crops eligible for a specific location
+    public List<Crop> getCropsEligibleForLocation(String location) {
+        return cropRepository.findCropsEligibleForLocation(location);
     }
 
-    /**
-     * Monitor sustainability metrics for a crop
-     * @param cropId The ID of the crop
-     * @param waterUsage Water usage metric
-     * @param soilHealth Soil health metric
-     * @param pesticideApplication Pesticide application metric
-     * @param energyUsage Energy usage metric
-     * @return A message indicating the result of the operation
-     */
-    public String monitorMetrics(Integer cropId, Double waterUsage, Double soilHealth,
-                                 Double pesticideApplication, Double energyUsage) {
-        try {
-            Optional<Crop> cropOptional = cropRepository.findById(cropId);
-            if (cropOptional.isPresent()) {
-                Crop crop = cropOptional.get();
-                Farm farm = crop.getFarm();
+    // Record a harvest for a crop
+    @Transactional
+    public Harvest recordHarvest(Integer cropId, Double yield, Integer qualityRating) {
+        Crop crop = getCropById(cropId);
+        Farm farm = crop.getFarm();
 
-                SustainabilityMetric metric = SustainabilityMetric.builder()
-                        .crop(crop)
-                        .farm(farm)
-                        .waterUsage(waterUsage)
-                        .soilHealth(soilHealth)
-                        .pesticideApplication(pesticideApplication)
-                        .energyUsage(energyUsage)
-                        .build();
+        Harvest harvest = Harvest.builder()
+                .crop(crop)
+                .farm(farm)
+                .date(new Date())
+                .yield(yield)
+                .qualityRating(qualityRating)
+                .inventory(crop.getInventory())
+                .build();
 
-                metricsRepository.save(metric);
+        harvest = harvestRepository.save(harvest);
 
-                return "Sustainability metrics recorded successfully for crop: " + crop.getCropType();
-            } else {
-                return "Crop not found with ID: " + cropId;
-            }
-        } catch (Exception e) {
-            return "Failed to monitor metrics: " + e.getMessage();
-        }
+        // Update average yield for the crop
+        updateCropAverageYield(crop);
+
+        return harvest;
     }
 
-    /**
-     * Calculate estimated yield for a crop based on historical data
-     * @param cropId The ID of the crop
-     * @return The estimated yield for the crop
-     */
-    public Double calculateEstimatedYield(Integer cropId) {
-        Optional<Crop> cropOptional = cropRepository.findById(cropId);
-        if (cropOptional.isPresent()) {
-            Crop crop = cropOptional.get();
-            return crop.getAverageYield();
-        } else {
+    // Update the average yield of a crop
+    private void updateCropAverageYield(Crop crop) {
+        List<Harvest> harvests = harvestRepository.findByCropId(crop.getCropID());
+
+        if (harvests.isEmpty()) {
+            return;
+        }
+
+        double totalYield = harvests.stream()
+                .mapToDouble(Harvest::getYield)
+                .sum();
+
+        double avgYield = totalYield / harvests.size();
+        crop.setAverageYield(avgYield);
+        cropRepository.save(crop);
+    }
+
+    // Record sustainability metrics for a crop
+    @Transactional
+    public SustainabilityMetric recordSustainabilityMetrics(Integer cropId, Double waterUsage,
+                                                            Double soilHealth, Double pesticideApplication,
+                                                            Double energyUsage) {
+        Crop crop = getCropById(cropId);
+        Farm farm = crop.getFarm();
+
+        SustainabilityMetric metric = SustainabilityMetric.builder()
+                .crop(crop)
+                .farm(farm)
+                .waterUsage(waterUsage)
+                .soilHealth(soilHealth)
+                .pesticideApplication(pesticideApplication)
+                .energyUsage(energyUsage)
+                .build();
+
+        return metricsRepository.save(metric);
+    }
+
+    // Calculate sustainability score for a crop
+    public Double calculateSustainabilityScore(Integer cropId) {
+        Crop crop = getCropById(cropId);
+        List<SustainabilityMetric> metrics = metricsRepository.findByCropId(crop.getCropID());
+
+        if (metrics.isEmpty()) {
             return 0.0;
         }
+
+        // Get most recent metrics
+        SustainabilityMetric latest = metrics.getFirst();
+
+        // Calculate score (example calculation - adjust weights as needed)
+        double waterScore = Math.max(0, 100 - latest.getWaterUsage() * 10); // Lower water usage is better
+        double soilScore = latest.getSoilHealth() * 10; // Higher soil health is better
+        double pesticideScore = Math.max(0, 100 - latest.getPesticideApplication() * 20); // Lower pesticide use is better
+        double energyScore = Math.max(0, 100 - latest.getEnergyUsage() * 5); // Lower energy use is better
+
+        // Weighted average
+        return (waterScore * 0.3 + soilScore * 0.3 + pesticideScore * 0.25 + energyScore * 0.15);
     }
 
-    /**
-     * Get all crops for a specific growing season
-     * @param season The growing season to filter by
-     * @return List of crops for the specified season
-     */
+    // Get crops by growing season
     public List<Crop> getCropsByGrowingSeason(String season) {
-        return cropRepository.findAll().stream()
-                .filter(crop -> season.equals(crop.getGrowingSeason()))
-                .toList();
+        return cropRepository.findByGrowingSeason(season);
+    }
+
+    // Get crops by location requirement
+    public List<Crop> getCropsByLocationRequirement(String locationRequirement) {
+        return cropRepository.findByLocationRequirement(locationRequirement);
+    }
+
+    // Get crops by farm ID
+    public List<Crop> getCropsByFarm(Integer farmId) {
+        return cropRepository.findByFarmFarmID(farmId);
+    }
+
+    // Get high-yielding crops
+    public List<Crop> getHighYieldingCrops(Double minimumYield) {
+        return cropRepository.findByAverageYieldGreaterThan(minimumYield);
+    }
+
+    // Update crop details
+    @Transactional
+    public String updateCrop(Crop crop) {
+        try {
+            if (!cropRepository.existsById(crop.getCropID())) {
+                return "Crop not found with ID: " + crop.getCropID();
+            }
+            cropRepository.save(crop);
+            return "Crop updated successfully";
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update crop: " + e.getMessage(), e);
+        }
+    }
+
+    // Assign a crop to a farm
+    @Transactional
+    public String assignCropToFarm(Integer cropId, Integer farmId) {
+        try {
+            Crop crop = getCropById(cropId);
+            Farm farm = farmRepository.findById(farmId)
+                    .orElseThrow(() -> new RuntimeException("Farm not found with ID: " + farmId));
+
+            crop.setFarm(farm);
+            cropRepository.save(crop);
+            return "Crop successfully assigned to farm";
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to assign crop to farm: " + e.getMessage(), e);
+        }
+    }
+
+    // Get crops by growing condition
+    public List<Crop> getCropsByGrowingCondition(boolean condition) {
+        return cropRepository.findByGrowingConditions(condition);
+    }
+
+    // Update crop planting schedule
+    @Transactional
+    public String updateCropPlantingSchedule(Integer cropId, Date newSchedule) {
+        try {
+            Crop crop = getCropById(cropId);
+            crop.setPlantingSchedule(newSchedule);
+            cropRepository.save(crop);
+            return "Crop planting schedule updated successfully";
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update crop planting schedule: " + e.getMessage(), e);
+        }
     }
 }

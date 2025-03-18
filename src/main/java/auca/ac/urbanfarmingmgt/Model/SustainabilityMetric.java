@@ -1,8 +1,14 @@
-package auca.ac.urbanfarmingmgt.model;
+package auca.ac.urbanfarmingmgt.Model;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @Table(name = "SustainabilityMetrics")
 public class SustainabilityMetric {
     @Id

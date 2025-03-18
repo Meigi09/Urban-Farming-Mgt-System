@@ -1,7 +1,7 @@
 package auca.ac.urbanfarmingmgt.Controller;
 
 import auca.ac.urbanfarmingmgt.Services.SustainabilityService;
-import auca.ac.urbanfarmingmgt.model.SustainabilityMetric;
+import auca.ac.urbanfarmingmgt.Model.SustainabilityMetric;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
